@@ -28,15 +28,13 @@ dataset: {
 }
 model: {
   model_name: VitAda,
-  backbone_type: SGP,
+  backbone_type: VisionTransformerCP,
   fpn_type: identity,
   backbone_arch: [2, 2, 5],
   scale_factor: 2,
   regression_range: [[0, 4], [2, 8], [4, 16], [8, 32], [16, 64], [32, 10000]],
-  n_sgp_win_size: 1,
-  sgp_mlp_dim: 1024,
   embd_kernel_size: 3,
-  embd_dim: 512,
+  embd_dim: 384,
   embd_with_ln: True,
   fpn_dim: 512,
   fpn_with_ln: True,
@@ -53,7 +51,10 @@ model: {
   init_conv_vars: 0,
   num_bins: 16,
   iou_weight_power: 0.25,
-  input_noise: 0.0
+  input_noise: 0.0,
+  pretrain: pretrain="pretrained/vit-small-p16_videomae-k400-pre_16x4x1_kinetics-400_my.pth",
+  norm_eval: True,
+  freeze_backbone: True
 }
 opt: {
   type: AdamW,
@@ -96,4 +97,9 @@ test_cfg: {
   multiclass_nms: True,
   voting_thresh: 0.75,
   ext_score_file: null,
+}
+custom: {
+  pretrain: pretrain="pretrained/vit-small-p16_videomae-k400-pre_16x4x1_kinetics-400_my.pth",
+  norm_eval: True,
+  freeze_backbone: True
 }
