@@ -29,6 +29,7 @@ from camera_baseline.tridet.main import run_tridet
 from camera_baseline.vit_adapter.main import run_vit_adapter
 
 
+
 def main(args):
     if args.neptune:
         run = neptune.init_run(
@@ -88,6 +89,8 @@ def main(args):
         elif config['name'] == 'tridet':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_tridet(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         elif config['name'] == 'vit_adapter':
+            t_losses, v_losses, v_mAP, v_preds, v_gt = run_vit_adapter(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
+        elif config['name'] == 'vit_adapter_cp':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_vit_adapter(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         
         # raw results
@@ -176,7 +179,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     #parser.add_argument('--config', default='./configs/60_frames_30_stride/tridet_inertial.yaml')
     # Uncomment next line to run program with vit adapter model
-    parser.add_argument('--config', default='./configs/60_frames_30_stride/vit_adapter_inertial.yaml')
+    #parser.add_argument('--config', default='./configs/60_frames_30_stride/vit_adapter_inertial.yaml')
+    parser.add_argument('--config', default='./configs/60_frames_30_stride/vit_adapter_inertial_cp.yaml')
     parser.add_argument('--eval_type', default='split')
     parser.add_argument('--neptune', default=False, type=bool)
     parser.add_argument('--run_id', default='test', type=str)

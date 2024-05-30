@@ -22,8 +22,11 @@ from .libs.datasets import make_dataset, make_data_loader
 from .libs.modeling import make_meta_arch
 from .libs.utils import (train_one_epoch, ANETdetection, save_checkpoint, make_optimizer, make_scheduler, ModelEma)
 from .libs.utils.train_utils import valid_one_epoch
+from .libs.utils.train_utils import build_optimizer
 from .libs.core.config import _update_config
 
+from .OpenTAD.opentad.models import build_detector
+from mmengine.config import Config, DictAction
 
 def run_vit_adapter(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator, run):
     cfg = _update_config(cfg)
@@ -59,8 +62,24 @@ def run_vit_adapter(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator
     # not ideal for multi GPU training, ok for now
     model = nn.DataParallel(model, device_ids=cfg['devices'])
     print("Number of learnable parameters for TriDet: {}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
+    
+    cfg_tad = Config.fromfile("configs/adatad/thumos/e2e_thumos_videomae_s_768x1_160_frozen.py")
+    model_tad = build_detector(cfg_tad.model)
+    model_tad = nn.DataParallel(model_tad, device_ids=cfg['devices'])
+
+    # Model EMA
+    use_ema = getattr(cfg_tad.solver, "ema", False)
+    if use_ema:
+        model_ema = ModelEma(model_tad)
+    else:
+        model_ema = None
+
     # optimizer
-    optimizer = make_optimizer(model, cfg['opt'])
+    #optimizer = make_optimizer(model, cfg['opt'])
+    
+    cfg_opti = dict(type="AdamW", lr=1e-4, weight_decay=0.05, paramwise=False)
+    optimizer = build_optimizer(cfg_opti, model)
+    
     # schedule
     num_iters_per_epoch = len(train_loader)
     scheduler = make_scheduler(optimizer, cfg['opt'], num_iters_per_epoch)

@@ -28,7 +28,7 @@ dataset: {
 }
 model: {
   model_name: VitAda,
-  backbone_type: VisionTransformerCP,
+  backbone_type: VisionTransformerAdapter,
   fpn_type: identity,
   backbone_arch: [2, 2, 5],
   scale_factor: 2,
