@@ -3,6 +3,7 @@ from typing import Dict, List, Optional, Union
 
 import math
 import torch
+import numpy as np
 import torch.nn.functional as F
 import torch.utils.checkpoint as cp
 from torch import Tensor, nn
@@ -54,11 +55,14 @@ class Adapter(BaseModule):
         trunc_normal_init(self.down_proj, std=0.02, bias=0)
         constant_init(self.up_proj, 0)  # the last projection layer is initialized to 0
 
-    def forward(self, x: Tensor, h: int, w: int) -> Tensor:
-        inputs = x
+    def forward(self, x: Tensor, mask) -> Tensor:
+        inputs = x[0][:,None,:].T
+
+        h = 9
+        w = 1
 
         # down and up projection
-        x = self.down_proj(x)
+        x = self.down_proj(x[0][:,None,:].T)
         x = self.act(x)
 
         # temporal depth-wise convolution
@@ -72,7 +76,7 @@ class Adapter(BaseModule):
         x = x + attn
 
         x = self.up_proj(x)
-        return x * self.gamma + inputs
+        return x * self.gamma + inputs, mask
 
 
 class PlainAdapter(BaseModule):
@@ -342,7 +346,7 @@ class VisionTransformerAdapter(BaseModule):
         self,
         img_size: int = 224,
         patch_size: int = 16,
-        in_channels: int = 3,
+        in_channels: int = 2,
         embed_dims: int = 768,
         depth: int = 12,
         num_heads: int = 12,
@@ -379,11 +383,11 @@ class VisionTransformerAdapter(BaseModule):
         self.patch_embed = PatchEmbed(
             in_channels=in_channels,
             embed_dims=embed_dims,
-            conv_type="Conv3d",
-            kernel_size=(tubelet_size, patch_size, patch_size),
-            stride=(tubelet_size, patch_size, patch_size),
-            padding=(0, 0, 0),
-            dilation=(1, 1, 1),
+            conv_type="Conv1d",
+            kernel_size=16,
+            stride=tubelet_size,
+            padding=0,
+            dilation=1,
         )
 
         grid_size = img_size // patch_size
@@ -435,7 +439,7 @@ class VisionTransformerAdapter(BaseModule):
         ratio = num_adapter_param / num_vit_param * 100
         print("ViT's param: {}, Adapter's params: {}, ratio: {:2.1f}%".format(num_vit_param, num_adapter_param, ratio))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, mask, pos_embed=None) -> Tensor:
         """Defines the computation performed at every call.
 
         Args:
@@ -446,18 +450,19 @@ class VisionTransformerAdapter(BaseModule):
         """
         self._freeze_layers()
 
-        b, _, _, h, w = x.shape
+        b, h, w = x.shape
         h //= self.patch_size
         w //= self.patch_size
-        x = self.patch_embed(x)[0]
+        tmp = x.reshape(512,2,2304)
+        x = self.patch_embed(tmp)[0]
         if (h, w) != self.grid_size:
             pos_embed = self.pos_embed.reshape(-1, *self.grid_size, self.embed_dims)
             pos_embed = pos_embed.permute(0, 3, 1, 2)
             pos_embed = F.interpolate(pos_embed, size=(h, w), mode="bicubic", align_corners=False)
             pos_embed = pos_embed.permute(0, 2, 3, 1).flatten(1, 2)
             pos_embed = pos_embed.reshape(1, -1, self.embed_dims)
-        else:
-            pos_embed = self.pos_embed
+        #else:
+            #pos_embed = self.pos_embed
 
         x = x + pos_embed
         x = self.pos_drop(x)

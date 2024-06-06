@@ -39,7 +39,7 @@ def make_optimizer(model, optimizer_config):
     decay = set()
     no_decay = set()
     whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, MaskedConv1D)
-    blacklist_weight_modules = (LayerNorm, torch.nn.GroupNorm)
+    blacklist_weight_modules = (torch.nn.Dropout, torch.nn.Identity, LayerNorm, torch.nn.GroupNorm)
 
     # loop over all modules / params
     for mn, m in model.named_modules():
@@ -48,17 +48,25 @@ def make_optimizer(model, optimizer_config):
             if pn.endswith('bias'):
                 # all biases will not be decayed
                 no_decay.add(fpn)
-            elif pn.endswith('weight') and isinstance(m, whitelist_weight_modules):
-                # weights of whitelist modules will be weight decayed
-                decay.add(fpn)
+            
             elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
                 # weights of blacklist modules will NOT be weight decayed
                 no_decay.add(fpn)
+                if fpn in decay: decay.remove(fpn)
+
+            elif pn.endswith('weight') and not isinstance(m, blacklist_weight_modules):
+                # weights of whitelist modules will be weight decayed
+                decay.add(fpn)
+                if fpn in no_decay: no_decay.remove(fpn)
+            
             elif pn.endswith('scale') and isinstance(m, (Scale, AffineDropPath)):
                 # corner case of our scale layer
                 no_decay.add(fpn)
             elif pn.endswith('rel_pe'):
                 # corner case for relative position encoding
+                no_decay.add(fpn)
+            else:
+                # all remaining parameters should not be decayed
                 no_decay.add(fpn)
 
     # validate that we considered every parameter

@@ -5,7 +5,7 @@ from torch.nn import functional as F
 from .models import register_backbone
 from .blocks import (get_sinusoid_encoding, TransformerBlock, MaskedConv1D,
                      ConvBlock, LayerNorm)
-from .adapters import VisionTransformerAdapter
+from .adapters import Adapter, VisionTransformerAdapter
 
 
 @register_backbone("convTransformer")
@@ -89,15 +89,11 @@ class ConvTransformerBackbone(nn.Module):
                 )
             )
             self.stem.append(
-                VisionTransformerAdapter(
-                    img_size=(n_in,1),
-                    patch_size=max_len,
+                Adapter(
                     embed_dims=n_embd,
-                    num_heads=n_head,
-                    drop_rate=proj_pdrop,
-                    attn_drop_rate=attn_pdrop,
-                    drop_path_rate=path_pdrop,
-                    num_frames=mha_win_size,
+                    kernel_size=n_embd_ks,
+                    mlp_ratio= 1/scale_factor,
+                    temporal_size= int(n_embd/2)
                 )
             )
 
@@ -116,18 +112,18 @@ class ConvTransformerBackbone(nn.Module):
                     use_rel_pe=self.use_rel_pe
                 )
             )
-            self.branch.append(
+            """ self.branch.append(
                 VisionTransformerAdapter(
-                    img_size=(n_in,1),
+                    img_size=(n_embd,1),
                     patch_size=max_len,
                     embed_dims=n_embd,
                     num_heads=n_head,
                     drop_rate=proj_pdrop,
                     attn_drop_rate=attn_pdrop,
                     drop_path_rate=path_pdrop,
-                    num_frames=mha_win_size,
+                    num_frames=mha_win_size[1 + idx],
                 )
-            )
+            ) """
 
         # init weights
         self.apply(self.__init_weights__)
