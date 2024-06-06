@@ -56,27 +56,39 @@ class Adapter(BaseModule):
         constant_init(self.up_proj, 0)  # the last projection layer is initialized to 0
 
     def forward(self, x: Tensor, mask) -> Tensor:
-        inputs = x[0][:,None,:].T
-
-        h = 9
+        h = 2
         w = 1
 
-        # down and up projection
-        x = self.down_proj(x[0][:,None,:].T)
-        x = self.act(x)
+        out = torch.zeros_like(x)
+        y = x.detach().clone()
 
-        # temporal depth-wise convolution
-        B, N, C = x.shape  # 48, 8*10*10, 384
-        attn = x.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,384,10,10,384]
-        attn = attn.permute(0, 2, 3, 4, 1).flatten(0, 2)  # [b*h*w,c,t] [1*10*10,384,384]
-        attn = self.dwconv(attn)  # [b*h*w,c,t] [1*10*10,384,384]
-        attn = self.conv(attn)  # [b*h*w,c,t] [1*10*10,384,384]
-        attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,384,10,10,384]
-        attn = attn.reshape(B, N, C)
-        x = x + attn
+        print(y.shape)
+        print(y[0].shape)
+        print(y[1].shape)
 
-        x = self.up_proj(x)
-        return x * self.gamma + inputs, mask
+        with torch.autograd.set_detect_anomaly(True):
+            for i in range(out.shape[0]):
+
+                inputs = y[i]
+
+                # down and up projection
+                y = self.down_proj(y[i].T)
+                y = self.act(y)
+
+                # temporal depth-wise convolution
+                B, N = y.shape  # 48, 8*10*10, 384
+                attn = y.reshape(-1, self.temporal_size, h, w, y.shape[-1])  # [b,t,h,w,c]  [1,384,10,10,384]
+                attn = attn.permute(0, 2, 3, 4, 1).flatten(0, 2)  # [b*h*w,c,t] [1*10*10,384,384]
+                attn = self.dwconv(attn)  # [b*h*w,c,t] [1*10*10,384,384]
+                attn = self.conv(attn)  # [b*h*w,c,t] [1*10*10,384,384]
+                attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,384,10,10,384]
+                attn = attn.reshape(B, N)
+                y = y + attn
+
+                y = self.up_proj(y)
+
+                out[i] = y.T * self.gamma + inputs
+        return out, mask
 
 
 class PlainAdapter(BaseModule):

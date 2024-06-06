@@ -93,7 +93,7 @@ class ConvTransformerBackbone(nn.Module):
                     embed_dims=n_embd,
                     kernel_size=n_embd_ks,
                     mlp_ratio= 1/scale_factor,
-                    temporal_size= int(n_embd/2)
+                    temporal_size= int(max_len/2)
                 )
             )
 
