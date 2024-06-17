@@ -24,8 +24,10 @@ from .libs.datasets.datasets import make_data_loader, make_dataset
 from .libs.utils.train_utils import valid_one_epoch
 from .libs.core.config import _update_config
 
+from .libs.modeling.adapters import TemporalInformativeAdapter
 
-def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator, run):
+
+def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator, run, adapter=False):
     cfg = _update_config(cfg)
     split_name = cfg['dataset']['json_anno'].split('/')[-1].split('.')[0]
     mkdir_if_missing(os.path.join(ckpt_folder, 'ckpts'))
@@ -57,7 +59,7 @@ def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generato
 
     # model
     model = make_meta_arch(cfg['model']['model_name'], **cfg['model'])
-    model = nn.DataParallel(model, device_ids=cfg['devices'])
+    #model = nn.DataParallel(model, device_ids=cfg['devices'])
     print("Number of learnable parameters for ActionFormer: {}".format(sum(p.numel() for p in model.parameters() if p.requires_grad)))
     # optimizer
     optimizer = make_optimizer(model, cfg['opt'])
@@ -81,6 +83,7 @@ def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generato
             scheduler.load_state_dict(checkpoint['scheduler'])
             print("=> loaded checkpoint '{:s}' (epoch {:d}".format(resume, checkpoint['epoch']))
             del checkpoint
+
         else:
             print("=> no checkpoint found at '{}'".format(resume))
             return
@@ -157,4 +160,5 @@ def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generato
             for tiou, tiou_mAP in zip(cfg['dataset']['tiou_thresholds'], val_mAP):
                     run[split_name].append({'mAP@' + str(tiou): tiou_mAP}, step=epoch)
 
+    torch.save(model.state_dict(), "./test_run.pth")    
     return t_losses, v_losses, val_mAP, v_preds, v_gt 

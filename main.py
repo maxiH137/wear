@@ -82,7 +82,7 @@ def main(args):
         if config['name'] == 'deepconvlstm' or config['name'] == 'attendanddiscriminate':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_inertial_network(train_sbjs, val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         elif config['name'] == 'actionformer':
-            t_losses, v_losses, v_mAP, v_preds, v_gt = run_actionformer(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
+            t_losses, v_losses, v_mAP, v_preds, v_gt = run_actionformer(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run, args.adapter)
         elif config['name'] == 'tridet':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_tridet(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         
@@ -165,12 +165,46 @@ def main(args):
         run['final_precision'] = (np.nanmean(v_prec))
         run['final_recall'] = (np.nanmean(v_rec))
         run['final_f1'] = (np.nanmean(v_f1))
-
-    print("ALL FINISHED")
+    print("Training finished")
+    
+    # add the temporal informative adapter (TIA) to the model
+    if args.adapter:
+        print("Starting fine tuning")
+        # freeze all network layers
+        for param in model.parameters():
+            param.requires_grad = False
+        
+        i = 0
+        features = []
+        adapters = []
+        adapter_outs = []
+        adapter_sum = 0
+        # add TIAs for each stem layer
+        for layer in model.backbone.stem.children():
+            def adapter_hook(module, input_, output):
+                features.append(output)
+            # register forward hooks for all layers
+            layer.register_forward_hook(adapter_hook)
+            # add TIAs for each backbone layer
+            adapters.append(TemporalInformativeAdapter())
+            # save outputs of all TIAs
+            adapter_outs.append(adapters[i].forward(features[i]))
+            adapter_sum += adapter_outs[i]
+            i += 1
+        # repeat the same for branch layers
+        for layer in model.backbone.branch.children():
+            # register forward hooks for all layers
+            layer.register_forward_hook(adapter_hook)
+            # add TIAs for each backbone layer
+            adapters.append(TemporalInformativeAdapter())
+            # save outputs of all TIAs
+            adapter_outs.append(adapters[i].forward(features[i]))
+            adapter_sum += adapter_outs[i]
+            i += 1
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/60_frames_30_stride/tridet_combined.yaml')
+    parser.add_argument('--config', default='./configs/60_frames_30_stride/actionformer_inertial.yaml')
     parser.add_argument('--eval_type', default='split')
     parser.add_argument('--neptune', default=False, type=bool)
     parser.add_argument('--run_id', default='test', type=str)
@@ -178,6 +212,7 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-freq', default=-1, type=int)
     parser.add_argument('--resume', default='', type=str)
     parser.add_argument('--gpu', default='cuda:0', type=str)
+    parser.add_argument('--adapter', default=False, type=bool)
     args = parser.parse_args()
     main(args)  
 

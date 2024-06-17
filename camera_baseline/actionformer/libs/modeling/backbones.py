@@ -3,9 +3,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from .models import register_backbone
-from .blocks import (get_sinusoid_encoding, TransformerBlock, MaskedConv1D,
+from .blocks import (get_sinusoid_encoding, TransformerBlock, AdapterBlock, MaskedConv1D,
                      ConvBlock, LayerNorm)
-from .adapters import Adapter, VisionTransformerAdapter
+from .adapters import TemporalInformativeAdapter
 
 
 @register_backbone("convTransformer")
@@ -89,14 +89,8 @@ class ConvTransformerBackbone(nn.Module):
                 )
             )
             self.stem.append(
-                Adapter(
-                    embed_dims=n_embd,
-                    kernel_size=n_embd_ks,
-                    mlp_ratio= 1/scale_factor,
-                    temporal_size= int(max_len/2)
-                )
+                AdapterBlock(n_embd)
             )
-
 
         # main branch using transformer with pooling
         self.branch = nn.ModuleList()
@@ -112,18 +106,7 @@ class ConvTransformerBackbone(nn.Module):
                     use_rel_pe=self.use_rel_pe
                 )
             )
-            """ self.branch.append(
-                VisionTransformerAdapter(
-                    img_size=(n_embd,1),
-                    patch_size=max_len,
-                    embed_dims=n_embd,
-                    num_heads=n_head,
-                    drop_rate=proj_pdrop,
-                    attn_drop_rate=attn_pdrop,
-                    drop_path_rate=path_pdrop,
-                    num_frames=mha_win_size[1 + idx],
-                )
-            ) """
+            #self.branch.append(TemporalInformativeAdapter())
 
         # init weights
         self.apply(self.__init_weights__)
