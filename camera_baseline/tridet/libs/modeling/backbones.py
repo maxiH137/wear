@@ -2,7 +2,7 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 
-from .blocks import (get_sinusoid_encoding, MaskedConv1D, ConvBlock, LayerNorm, SGPBlock)
+from .blocks import (get_sinusoid_encoding, MaskedConv1D, ConvBlock,AdapterBlock, LayerNorm, SGPBlock)
 from .models import register_backbone
 
 
@@ -55,7 +55,10 @@ class SGPBackbone(nn.Module):
             self.embd.append(MaskedConv1D(
                 in_channels, n_embd, n_embd_ks,
                 stride=1, padding=n_embd_ks // 2, bias=(not with_ln)
+                )
             )
+            self.embd.append(
+                AdapterBlock(n_embd)
             )
             if with_ln:
                 self.embd_norm.append(
@@ -68,14 +71,22 @@ class SGPBackbone(nn.Module):
         self.stem = nn.ModuleList()
         for idx in range(arch[1]):
             self.stem.append(
-                SGPBlock(n_embd, 1, 1, n_hidden=sgp_mlp_dim, k=k, init_conv_vars=init_conv_vars))
+                SGPBlock(n_embd, 1, 1, n_hidden=sgp_mlp_dim, k=k, init_conv_vars=init_conv_vars)
+            )
+            self.stem.append(
+                AdapterBlock(n_embd)
+            )
 
         # main branch using transformer with pooling
         self.branch = nn.ModuleList()
         for idx in range(arch[2]):
             self.branch.append(SGPBlock(n_embd, self.sgp_win_size[1 + idx], self.scale_factor, path_pdrop=path_pdrop,
                                         n_hidden=sgp_mlp_dim, downsample_type=downsample_type, k=k,
-                                        init_conv_vars=init_conv_vars))
+                                        init_conv_vars=init_conv_vars)
+            )
+            self.branch.append(
+                AdapterBlock(n_embd)
+            )
         # init weights
         self.apply(self.__init_weights__)
 

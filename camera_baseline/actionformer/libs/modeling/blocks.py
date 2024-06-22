@@ -784,7 +784,9 @@ class ConvBlock(nn.Module):
         out = self.act(out)
 
         return out, out_mask
-    
+
+# The following code is modified from
+# https://github.com/sming256/OpenTAD/blob/main/opentad/models/backbones/vit_adapter.py
 class AdapterBlock(nn.Module):
     """
     A simple conv block similar to the basic block used in ResNet

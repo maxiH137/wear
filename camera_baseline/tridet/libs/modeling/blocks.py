@@ -175,6 +175,86 @@ class ConvBlock(nn.Module):
 
         return out, out_mask
 
+# The following code is modified from
+# https://github.com/sming256/OpenTAD/blob/main/opentad/models/backbones/vit_adapter.py
+class AdapterBlock(nn.Module):
+    """
+    A simple conv block similar to the basic block used in ResNet
+    """
+    def __init__(
+        self,
+        n_embd,                # dimension of the input features
+        kernel_size=3,         # conv kernel size
+        n_ds_stride=1,         # downsampling stride for the current layer
+        expansion_factor=0.25,    # expansion factor of feat dims
+        dilation=1,
+        n_out=None,            # output dimension, if None, set to input dim
+        act_layer=nn.ReLU,     # nonlinear activation used after conv, default ReLU
+        temporal_size=128
+    ):
+        super().__init__()
+
+        hidden_dims = int(n_embd * expansion_factor)
+
+        # temporal depth-wise convolution
+        self.temporal_size = temporal_size
+        self.dwconv = MaskedConv1D(
+             hidden_dims, 
+             hidden_dims, 
+             kernel_size, 
+             n_ds_stride, 
+             padding=(kernel_size // 2) * n_ds_stride
+        )
+
+        self.conv = MaskedConv1D(hidden_dims, hidden_dims, 1)
+        self.dwconv.conv.weight.data.normal_(mean=0.0, std=math.sqrt(2.0 / kernel_size))
+        self.dwconv.conv.bias.data.zero_()
+        self.conv.conv.weight.data.normal_(mean=0.0, std=math.sqrt(2.0 / hidden_dims))
+        self.conv.conv.bias.data.zero_()
+
+        # adapter projection
+        self.down_proj = nn.Linear(n_embd, hidden_dims)
+        self.act = nn.GELU()
+        self.up_proj = nn.Linear(hidden_dims, n_embd)
+        self.gamma = nn.Parameter(torch.ones(1))
+        trunc_normal_init(self.down_proj, std=0.02, bias=0)
+        constant_init(self.up_proj, 0)  # the last projection layer is initialized to 0
+
+        self.act = act_layer()
+
+    def forward(self, x, mask, pos_embd=None):
+        hidden_dims = 128
+        h = 1
+        w = 1
+
+        #print("Input shape: " + str(x.shape))
+        inputs = x
+        tmp = x.detach().clone()
+        out = np.zeros((x.shape[0], x.shape[2],hidden_dims), np.double)
+        # down and up projection
+        for i in range(tmp.shape[0]):
+            out[i] = self.act(self.down_proj(tmp[i].T)).detach().numpy()
+        #print("Down proj shape: " + str(out.shape))
+        # temporal depth-wise convolution
+        B, N, C = out.shape # 2, 2304, 128
+        out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype)
+        attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
+        #print("Reshape shape: " + str(attn.shape))
+        attn = attn.permute(0, 2, 3, 1, 4).flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
+        #print("Permute shape: " + str(attn.shape))
+        attn = torch.tensor(attn, dtype=self.dwconv.conv.weight.dtype)
+        mask = torch.tensor(mask, dtype=self.dwconv.conv.weight.dtype)
+
+        attn, out_mask = self.dwconv(attn, mask)  # [b*h*w,c,t] [1*1*1,128,2304]
+        attn, out_mask = self.conv(attn, out_mask)  # [b*h*w,c,t] [1*1*1,128,2304]
+        attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,2304,1,1,256]
+        attn = attn.reshape(B, N, C)
+        out = out + attn
+
+        out = self.up_proj(out)
+        out = out.permute(0,2,1)
+        #print("Output shape: " + str(out.shape))
+        return out * self.gamma + inputs, out_mask
 
 class SGPBlock(nn.Module):
     """
