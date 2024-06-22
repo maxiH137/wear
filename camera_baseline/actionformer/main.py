@@ -27,7 +27,7 @@ from .libs.core.config import _update_config
 from .libs.modeling.adapters import TemporalInformativeAdapter
 
 
-def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator, run, adapter=False):
+def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generator, run):
     cfg = _update_config(cfg)
     split_name = cfg['dataset']['json_anno'].split('/')[-1].split('.')[0]
     mkdir_if_missing(os.path.join(ckpt_folder, 'ckpts'))
@@ -160,5 +160,4 @@ def run_actionformer(val_sbjs, cfg, ckpt_folder, ckpt_freq, resume, rng_generato
             for tiou, tiou_mAP in zip(cfg['dataset']['tiou_thresholds'], val_mAP):
                     run[split_name].append({'mAP@' + str(tiou): tiou_mAP}, step=epoch)
 
-    torch.save(model.state_dict(), "./test_run.pth")    
     return t_losses, v_losses, val_mAP, v_preds, v_gt 

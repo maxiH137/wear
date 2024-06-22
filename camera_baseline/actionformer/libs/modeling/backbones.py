@@ -106,7 +106,9 @@ class ConvTransformerBackbone(nn.Module):
                     use_rel_pe=self.use_rel_pe
                 )
             )
-            #self.branch.append(TemporalInformativeAdapter())
+            self.branch.append(
+                AdapterBlock(n_embd)
+            )
 
         # init weights
         self.apply(self.__init_weights__)
@@ -163,8 +165,9 @@ class ConvTransformerBackbone(nn.Module):
         # main branch with downsampling
         for idx in range(len(self.branch)):
             x, mask = self.branch[idx](x, mask)
-            out_feats += (x, )
-            out_masks += (mask, )
+            if(idx % 2 == 0):
+                out_feats += (x, )
+                out_masks += (mask, )
 
         return out_feats, out_masks
 

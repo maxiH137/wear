@@ -32,6 +32,7 @@ class SGPBackbone(nn.Module):
         super().__init__()
         assert len(arch) == 3
         assert len(sgp_win_size) == (1 + arch[2])
+        self.n_in = n_in
         self.arch = arch
         self.sgp_win_size = sgp_win_size
         self.max_len = max_len
@@ -87,6 +88,7 @@ class SGPBackbone(nn.Module):
             self.branch.append(
                 AdapterBlock(n_embd)
             )
+
         # init weights
         self.apply(self.__init_weights__)
 
@@ -102,7 +104,7 @@ class SGPBackbone(nn.Module):
         B, C, T = x.size()
 
         # embedding network
-        for idx in range(len(self.embd)):
+        for idx in range(len(self.embd_norm)):
             x, mask = self.embd[idx](x, mask)
             x = self.relu(self.embd_norm[idx](x))
 
@@ -131,15 +133,15 @@ class SGPBackbone(nn.Module):
         out_feats = tuple()
         out_masks = tuple()
         # 1x resolution
-        out_feats += (x,)
-        out_masks += (mask,)
+        out_feats += (x, )
+        out_masks += (mask, )
 
         # main branch with downsampling
         for idx in range(len(self.branch)):
             x, mask = self.branch[idx](x, mask)
-            out_feats += (x,)
-            out_masks += (mask,)
-
+            if(idx % 2 == 0):
+                out_feats += (x, )
+                out_masks += (mask, )
         return out_feats, out_masks
 
 

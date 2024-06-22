@@ -1,8 +1,10 @@
+import math
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn
 from .weight_init import trunc_normal_
+from mmengine.model.weight_init import constant_init, trunc_normal_init
 
 
 class MaskedConv1D(nn.Module):
@@ -233,11 +235,11 @@ class AdapterBlock(nn.Module):
         out = np.zeros((x.shape[0], x.shape[2],hidden_dims), np.double)
         # down and up projection
         for i in range(tmp.shape[0]):
-            out[i] = self.act(self.down_proj(tmp[i].T)).detach().numpy()
+            out[i] = self.act(self.down_proj(tmp[i].T)).cpu().detach().numpy()
         #print("Down proj shape: " + str(out.shape))
         # temporal depth-wise convolution
         B, N, C = out.shape # 2, 2304, 128
-        out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype)
+        out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype).cuda()
         attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
         #print("Reshape shape: " + str(attn.shape))
         attn = attn.permute(0, 2, 3, 1, 4).flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
@@ -247,7 +249,7 @@ class AdapterBlock(nn.Module):
 
         attn, out_mask = self.dwconv(attn, mask)  # [b*h*w,c,t] [1*1*1,128,2304]
         attn, out_mask = self.conv(attn, out_mask)  # [b*h*w,c,t] [1*1*1,128,2304]
-        attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,2304,1,1,256]
+        attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,2304,1,1,128]
         attn = attn.reshape(B, N, C)
         out = out + attn
 

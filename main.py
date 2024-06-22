@@ -82,7 +82,7 @@ def main(args):
         if config['name'] == 'deepconvlstm' or config['name'] == 'attendanddiscriminate':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_inertial_network(train_sbjs, val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         elif config['name'] == 'actionformer':
-            t_losses, v_losses, v_mAP, v_preds, v_gt = run_actionformer(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run, args.adapter)
+            t_losses, v_losses, v_mAP, v_preds, v_gt = run_actionformer(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         elif config['name'] == 'tridet':
             t_losses, v_losses, v_mAP, v_preds, v_gt = run_tridet(val_sbjs, config, log_dir, args.ckpt_freq, args.resume, rng_generator, run)
         
@@ -212,7 +212,6 @@ if __name__ == '__main__':
     parser.add_argument('--ckpt-freq', default=-1, type=int)
     parser.add_argument('--resume', default='', type=str)
     parser.add_argument('--gpu', default='cuda:0', type=str)
-    parser.add_argument('--adapter', default=False, type=bool)
     args = parser.parse_args()
     main(args)  
 
