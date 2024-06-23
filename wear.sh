@@ -5,4 +5,4 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:2
 
-python main.py --config ./configs/60_frames_30_stride/actionformer_inertial.yaml --seed 1 --eval_type split
+python main.py --config ./configs/60_frames_30_stride/tridet_inertial.yaml --seed 1 --eval_type split

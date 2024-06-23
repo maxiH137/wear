@@ -167,41 +167,6 @@ def main(args):
         run['final_f1'] = (np.nanmean(v_f1))
     print("Training finished")
     
-    # add the temporal informative adapter (TIA) to the model
-    if args.adapter:
-        print("Starting fine tuning")
-        # freeze all network layers
-        for param in model.parameters():
-            param.requires_grad = False
-        
-        i = 0
-        features = []
-        adapters = []
-        adapter_outs = []
-        adapter_sum = 0
-        # add TIAs for each stem layer
-        for layer in model.backbone.stem.children():
-            def adapter_hook(module, input_, output):
-                features.append(output)
-            # register forward hooks for all layers
-            layer.register_forward_hook(adapter_hook)
-            # add TIAs for each backbone layer
-            adapters.append(TemporalInformativeAdapter())
-            # save outputs of all TIAs
-            adapter_outs.append(adapters[i].forward(features[i]))
-            adapter_sum += adapter_outs[i]
-            i += 1
-        # repeat the same for branch layers
-        for layer in model.backbone.branch.children():
-            # register forward hooks for all layers
-            layer.register_forward_hook(adapter_hook)
-            # add TIAs for each backbone layer
-            adapters.append(TemporalInformativeAdapter())
-            # save outputs of all TIAs
-            adapter_outs.append(adapters[i].forward(features[i]))
-            adapter_sum += adapter_outs[i]
-            i += 1
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--config', default='./configs/60_frames_30_stride/actionformer_inertial.yaml')
