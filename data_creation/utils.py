@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, date
 from glob import glob
 import os
 import re
+import yaml
 
 import pandas as pd
 import numpy as np
@@ -28,6 +29,11 @@ label_dict = {
     'lunges (complex)': 16,
     'bench-dips': 17
 }
+
+def load_config(config_file):
+    with open(config_file, "r") as fd:
+        config = yaml.load(fd, Loader=yaml.FullLoader)
+    return config
 
 def convert_labels_to_annotation_json(labels, sampling_rate, fps, l_dict):
     annotations = []
