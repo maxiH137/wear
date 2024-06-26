@@ -169,7 +169,7 @@ def main(args):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/60_frames_30_stride/actionformer_inertial.yaml')
+    parser.add_argument('--config', default='./configs/60_frames_30_stride/tridet_inertial.yaml')
     parser.add_argument('--eval_type', default='split')
     parser.add_argument('--neptune', default=False, type=bool)
     parser.add_argument('--run_id', default='test', type=str)
