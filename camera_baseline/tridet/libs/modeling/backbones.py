@@ -58,9 +58,6 @@ class SGPBackbone(nn.Module):
                 stride=1, padding=n_embd_ks // 2, bias=(not with_ln)
                 )
             )
-            self.embd.append(
-                AdapterBlock(n_embd)
-            )
             if with_ln:
                 self.embd_norm.append(
                     LayerNorm(n_embd)
