@@ -54,6 +54,9 @@ def make_optimizer(model, optimizer_config):
             elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
                 # weights of blacklist modules will NOT be weight decayed
                 no_decay.add(fpn)
+            elif pn.endswith('gamma'):
+                # adapter parameter that should not be decayed
+                no_decay.add(fpn)
             elif pn.endswith('scale') and isinstance(m, (Scale, AffineDropPath)):
                 # corner case of our scale layer
                 no_decay.add(fpn)

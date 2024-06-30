@@ -9,14 +9,14 @@ import seaborn as sns
 from utils import majorityVoting, ANETdetection, convert_samples_to_segments
 
 # postprocessing parameters
-path_to_preds = ['path/to/preds/to/be/analysed']
-seeds = [1, 2, 3]
+path_to_preds = ['../logs/tridet']
+seeds = [2]
 sampling_rate = 50
 majority_filters = [1, 251, 501, 751, 1001, 1251]
 json_files = [
-    'data/wear/annotations/wear_split_1.json', 
-    'data/wear/annotations/wear_split_2.json', 
-    'data/wear/annotations/wear_split_3.json'
+    '../data/wear/annotations/wear_split_1.json', 
+    '../data/wear/annotations/wear_split_2.json', 
+    '../data/wear/annotations/wear_split_3.json'
     ]
 
 
@@ -41,7 +41,7 @@ for path in path_to_preds:
             
                 v_data = np.empty((0, 12 + 2))
                 for sbj in val_sbjs:
-                    data = pd.read_csv(os.path.join('data/wear/raw/inertial/' + str(sampling_rate) + 'hz', sbj + '.csv'), index_col=False).replace({"label": label_dict}).fillna(0).to_numpy()
+                    data = pd.read_csv(os.path.join('../data/wear/raw/inertial/', sbj + '.csv'), index_col=False).replace({"label": label_dict}).fillna(0).to_numpy()
                     v_data = np.append(v_data, data, axis=0)
                     
                 v_preds = np.array([])

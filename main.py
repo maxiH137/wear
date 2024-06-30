@@ -165,12 +165,11 @@ def main(args):
         run['final_precision'] = (np.nanmean(v_prec))
         run['final_recall'] = (np.nanmean(v_rec))
         run['final_f1'] = (np.nanmean(v_f1))
-
-    print("ALL FINISHED")
-
+    print("Training finished")
+    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config', default='./configs/60_frames_30_stride/tridet_combined.yaml')
+    parser.add_argument('--config', default='./configs/60_frames_30_stride/tridet_inertial.yaml')
     parser.add_argument('--eval_type', default='split')
     parser.add_argument('--neptune', default=False, type=bool)
     parser.add_argument('--run_id', default='test', type=str)

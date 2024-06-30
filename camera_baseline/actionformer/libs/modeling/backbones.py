@@ -3,8 +3,9 @@ from torch import nn
 from torch.nn import functional as F
 
 from .models import register_backbone
-from .blocks import (get_sinusoid_encoding, TransformerBlock, MaskedConv1D,
+from .blocks import (get_sinusoid_encoding, TransformerBlock, AdapterBlock, MaskedConv1D,
                      ConvBlock, LayerNorm)
+from .adapters import TemporalInformativeAdapter
 
 
 @register_backbone("convTransformer")
@@ -87,6 +88,9 @@ class ConvTransformerBackbone(nn.Module):
                     use_rel_pe=self.use_rel_pe
                 )
             )
+            self.stem.append(
+                AdapterBlock(n_embd)
+            )
 
         # main branch using transformer with pooling
         self.branch = nn.ModuleList()
@@ -101,6 +105,9 @@ class ConvTransformerBackbone(nn.Module):
                     mha_win_size=self.mha_win_size[1 + idx],
                     use_rel_pe=self.use_rel_pe
                 )
+            )
+            self.branch.append(
+                AdapterBlock(n_embd)
             )
 
         # init weights
@@ -158,8 +165,9 @@ class ConvTransformerBackbone(nn.Module):
         # main branch with downsampling
         for idx in range(len(self.branch)):
             x, mask = self.branch[idx](x, mask)
-            out_feats += (x, )
-            out_masks += (mask, )
+            if(idx % 2 == 0):
+                out_feats += (x, )
+                out_masks += (mask, )
 
         return out_feats, out_masks
 
