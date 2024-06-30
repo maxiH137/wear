@@ -6,8 +6,10 @@ import argparse
 
 from utils import apply_sliding_window, label_dict, convert_labels_to_annotation_json, load_config
 
+# define loso
+sbjs = [['sbj_0'], ['sbj_1'], ['sbj_2'], ['sbj_3'], ['sbj_4'], ['sbj_5'], ['sbj_6'], ['sbj_7'], ['sbj_8'], ['sbj_9'], ['sbj_10'], ['sbj_11'], ['sbj_12'], ['sbj_13'], ['sbj_14'], ['sbj_15'], ['sbj_16'], ['sbj_17']]
 # define split
-sbjs = [['sbj_0', 'sbj_1', 'sbj_2', 'sbj_3', 'sbj_4', 'sbj_5'], ['sbj_6', 'sbj_7', 'sbj_8', 'sbj_9', 'sbj_10', 'sbj_11'], ['sbj_12', 'sbj_13', 'sbj_14', 'sbj_15', 'sbj_16', 'sbj_17']]
+#sbjs = [['sbj_0', 'sbj_1', 'sbj_2', 'sbj_3', 'sbj_4', 'sbj_5'], ['sbj_6', 'sbj_7', 'sbj_8', 'sbj_9', 'sbj_10', 'sbj_11'], ['sbj_12', 'sbj_13', 'sbj_14', 'sbj_15', 'sbj_16', 'sbj_17']]
 
 # change these parameters
 window_size = 50
@@ -15,12 +17,15 @@ window_overlap = 50
 frames = 60
 stride = 30
 
+activity = []
+
 # change output folder
 raw_inertial_folder = './data/wear/raw/inertial'
 inertial_folder_flat = './data/wear/processed/inertial_features/custom_flat'
 inertial_folder_custom = './data/wear/processed/inertial_features/custom'
 inertial_folder_aug = './data/wear/processed/inertial_features/augment'
 inertial_folder = './data/wear/processed/inertial_features/{}_frames_{}_stride'.format(frames, stride)
+aug_folder = '/perm_all'
 
 #i3d_folder = './data/wear/processed/i3d_features/{}_frames_{}_stride'.format(frames, stride)
 #combined_folder = './data/wear/processed/combined_features/{}_frames_{}_stride'.format(frames, stride)
@@ -29,7 +34,6 @@ anno_folder = './data/wear/annotations'
 
 # fixed dataset properties
 nb_sbjs = 18
-nb_sbjs_aug = nb_sbjs*6
 fps = 60
 sampling_rate = 50
 
@@ -40,8 +44,8 @@ def wear_anno(wear_annotation, number, sbj_anno, train_test, duration_seconds):
             'fps': fps,
             'annotations': sbj_anno,
             } 
-    number += 1
-    return wear_annotation, number
+    #number += 1
+    return wear_annotation
 
 def permute_subj(inertial_sbj, sbj_perm, matrix):
     
@@ -109,7 +113,7 @@ def inverting(inertial_sbj):
     return inertial_sbj * -1
 
 def reversing(inertial_sbj):
-    return inertial_sbj[:,-1::-1,:]
+    return inertial_sbj[:,::-1]
 
 def magnify(inertial_sbj):
     mag = np.random.randint(11,14)/10
@@ -124,31 +128,95 @@ def noise(inertial_sbj):
     return inertial_sbj
 
 
-def save_augment(sbj_perm, sbj_string, perm):
-    x = sbj_perm.label._values
+def save_augment(sbj_perm, sbj, number, perm, augment, cfg):
+    
     inertial_sbj = sbj_perm.replace({"label": label_dict}).fillna(-1).to_numpy()
     inertial_sbj[:, -1] += 1
     _, win_sbj, _ = apply_sliding_window(inertial_sbj, window_size, window_overlap)
     flipped_sbj = np.transpose(win_sbj[:, :, 1:], (0,2,1))
 
     # Normalization of all 12 sensor axis of a subject, so mean is 0 and std is 1
-    flipped_sbj = normalize_subj(flipped_sbj)
+    if(cfg['normalization']):
+        flipped_sbj = normalize_subj(flipped_sbj)
 
     output_inertial = flipped_sbj.reshape(flipped_sbj.shape[0], -1)
-   
-    # add further augmentation here if wanted
-    # output_inertial = noise(output_inertial)
-    # output_inertial = scaling(output_inertial)
-    # output_inertial = magnify(output_inertial)
+    
 
-    np.save(os.path.join(inertial_folder_aug + perm, sbj_string + '.npy'), output_inertial)
+    if(augment):
+        if(cfg['noise']):
+            noise_inertial = noise(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), noise_inertial)
+            number += 1
+        if(cfg['scaling']):
+            scaling_inertial = scaling(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), scaling_inertial)
+            number += 1
+        if(cfg['magnify']):
+            magnify_inertial = magnify(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), magnify_inertial)
+            number += 1
+        if(cfg['reversing']):
+            reversing_inertial = reversing(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), reversing_inertial)
+            number += 1
+        if(cfg['inverting']):
+            inverting_inertial = inverting(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), inverting_inertial)
+            number += 1
+        np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), output_inertial)
+    else:
+        np.save(os.path.join(inertial_folder_aug + perm, str(sbj) + '.npy'), output_inertial)
+    
+    return number
+
+def activity_sbj(sbj, label):
+    match label:
+        case 0:
+            jogging = 0
+        case 1:
+            jogging_rotating_arms = 0
+        case 2:
+            jogging_skipping = 0
+        case 3:
+            jogging_sidesteps = 0
+        case 4:
+            jogging_buttkicks = 0
+        case 5:
+            stretching_triceps = 0
+        case 6:
+            stretching_lunging = 0
+        case 7:
+            stretching_shoulders = 0
+        case 8:
+            stretching_hamstring = 0
+        case 9:
+            stretching_lumbar_rotation = 0
+        case 10:
+            push_ups = 0
+        case 11:
+            push_ups_complex = 0
+        case 12:
+            sit_ups = 0
+        case 13:
+            sit_ups_complex = 0
+        case 14:
+            burpees = 0
+        case 15:
+            lunges = 0
+        case 16:
+            lunges_complex = 0
+        case 17:
+            bench_dips = 0
+
 
 def data_creation(args):
 
     config = load_config(args.config)
-    number_anno = 18
+    number_anno = 17
     number = 18
-    raw_intertial_sbj_all = None
+    amount_aug_saved = 0
+    aug_saved_times = 0
+    #raw_intertial_sbj_all = None
 
     for i, split_sbjs in enumerate(sbjs):
         wear_annotations = {'version': 'Wear', 'database': {}, 'label_dict': label_dict}
@@ -156,7 +224,7 @@ def data_creation(args):
         for sbj in split_sbjs:
             
             raw_inertial_sbj = pd.read_csv(os.path.join(raw_inertial_folder, sbj + '.csv'), index_col=None)      
-            raw_intertial_sbj_all = pd.concat([raw_intertial_sbj_all, raw_inertial_sbj], ignore_index=True)
+            #raw_intertial_sbj_all = pd.concat([raw_intertial_sbj_all, raw_inertial_sbj], ignore_index=True)
 
             raw_inertial_sbj_perm1 = pd.read_csv(os.path.join(raw_inertial_folder, sbj + '.csv'), index_col=None) 
             raw_inertial_sbj_perm2 = pd.read_csv(os.path.join(raw_inertial_folder, sbj + '.csv'), index_col=None) 
@@ -164,24 +232,32 @@ def data_creation(args):
             raw_inertial_sbj_perm4 = pd.read_csv(os.path.join(raw_inertial_folder, sbj + '.csv'), index_col=None) 
             raw_inertial_sbj_perm5 = pd.read_csv(os.path.join(raw_inertial_folder, sbj + '.csv'), index_col=None) 
             
-            raw_inertial_sbj_perm1 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm1, np.array([[1,0,0], [0,0,1], [0,1,0]]))
-            raw_inertial_sbj_perm2 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm2, np.array([[0,1,0], [1,0,0], [0,0,1]]))
-            raw_inertial_sbj_perm3 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm3, np.array([[0,0,1], [0,1,0], [1,0,0]]))
-            raw_inertial_sbj_perm4 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm4, np.array([[0,0,1], [1,0,0], [0,1,0]]))
-            raw_inertial_sbj_perm5 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm5, np.array([[0,1,0], [0,0,1], [1,0,0]]))
+            if(config['augmentation']['permutation']):
+                raw_inertial_sbj_perm1 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm1, np.array([[1,0,0], [0,0,1], [0,1,0]]))
+                raw_inertial_sbj_perm2 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm2, np.array([[0,1,0], [1,0,0], [0,0,1]]))
+                raw_inertial_sbj_perm3 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm3, np.array([[0,0,1], [0,1,0], [1,0,0]]))
+                raw_inertial_sbj_perm4 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm4, np.array([[0,0,1], [1,0,0], [0,1,0]]))
+                raw_inertial_sbj_perm5 = permute_subj(raw_inertial_sbj, raw_inertial_sbj_perm5, np.array([[0,1,0], [0,0,1], [1,0,0]]))
 
-            save_augment(raw_inertial_sbj, sbj, '/perm_all')
-            save_augment(raw_inertial_sbj_perm1, 'sbj_' + str(number), '/perm_all')
-            number += 1
-            save_augment(raw_inertial_sbj_perm2, 'sbj_' + str(number), '/perm_all')
-            number += 1
-            save_augment(raw_inertial_sbj_perm3, 'sbj_' + str(number), '/perm_all')
-            number += 1
-            save_augment(raw_inertial_sbj_perm4, 'sbj_' + str(number), '/perm_all')
-            number += 1
-            save_augment(raw_inertial_sbj_perm5, 'sbj_' + str(number), '/perm_all')
-            number += 1
+            # Normal Subject without Augmentation except Normalization if True
+            number = save_augment(raw_inertial_sbj, sbj,number, aug_folder, False, config['augmentation'])
+            
+            # Augment Data, use the permuted subjects
+            if(config['augmentation']['permutation']):
+                number = save_augment(raw_inertial_sbj_perm1, sbj, number, aug_folder, True, config['augmentation'])
+                number += 1
+                number = save_augment(raw_inertial_sbj_perm2, sbj, number, aug_folder, True, config['augmentation'])
+                number += 1
+                number = save_augment(raw_inertial_sbj_perm3, sbj, number, aug_folder, True, config['augmentation'])
+                number += 1
+                number = save_augment(raw_inertial_sbj_perm4, sbj, number, aug_folder, True, config['augmentation'])
+                number += 1
+                number = save_augment(raw_inertial_sbj_perm5, sbj, number, aug_folder, True, config['augmentation'])
+                number += 1
 
+            amount_aug_saved = (number - (nb_sbjs - 1)) - (amount_aug_saved - 1) * aug_saved_times
+            aug_saved_times += 1
+            
             inertial_sbj = raw_inertial_sbj.replace({"label": label_dict}).fillna(-1).to_numpy()
             inertial_sbj[:, -1] += 1
             _, win_sbj, _ = apply_sliding_window(inertial_sbj, window_size, window_overlap)
@@ -212,15 +288,14 @@ def data_creation(args):
             # Add Augmentation only in training data, not in Validation data
             if curr_sbj in split_sbjs:
                 train_test = 'Validation'
-                wear_annotations, _           = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
+                wear_annotations = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
             else:
                 train_test = 'Training'
-                wear_annotations, _           = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
-                wear_annotations, number_anno = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
-                wear_annotations, number_anno = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
-                wear_annotations, number_anno = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
-                wear_annotations, number_anno = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
-                wear_annotations, number_anno = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                wear_annotations = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
+                
+                if(config['augmentation']['permutation']):
+                    for number_saved in range(amount_aug_saved+1):
+                        wear_annotations = wear_anno(wear_annotations, number_anno + number_saved + 1 + (j*amount_aug_saved), sbj_annos, train_test, duration_seconds)
 
             with open(os.path.join(anno_folder, 'wear_split_aug_' + str(int(i + 1)) +  '.json'), 'w') as outfile:
                 outfile.write(json.dumps(wear_annotations, indent = 4))
