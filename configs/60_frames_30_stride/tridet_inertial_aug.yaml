@@ -4,12 +4,30 @@ train_split: ['training']
 val_split: ['validation']
 devices: ['cuda:0']
 anno_json: [
-  'data/wear/annotations/wear_split_1.json',
-  'data/wear/annotations/wear_split_2.json',
-  'data/wear/annotations/wear_split_3.json'
+  'data/wear/annotations/wear_split_aug_1.json',
+  'data/wear/annotations/wear_split_aug_2.json',
+  'data/wear/annotations/wear_split_aug_3.json',
+  'data/wear/annotations/wear_split_aug_4.json',
+  'data/wear/annotations/wear_split_aug_5.json',
+  'data/wear/annotations/wear_split_aug_6.json',
+  'data/wear/annotations/wear_split_aug_7.json',
+  'data/wear/annotations/wear_split_aug_8.json',
+  'data/wear/annotations/wear_split_aug_9.json',
+  'data/wear/annotations/wear_split_aug_10.json',
+  'data/wear/annotations/wear_split_aug_11.json',
+  'data/wear/annotations/wear_split_aug_12.json',
+  'data/wear/annotations/wear_split_aug_13.json',
+  'data/wear/annotations/wear_split_aug_14.json',
+  'data/wear/annotations/wear_split_aug_15.json',
+  'data/wear/annotations/wear_split_aug_16.json',
+  'data/wear/annotations/wear_split_aug_17.json',
+  'data/wear/annotations/wear_split_aug_18.json'
 ]
+
+finetune: False
+
 dataset: {
-  feat_folder: ./data/wear/processed/inertial_features/augment/perm1,
+  feat_folder: ./data/wear/processed/inertial_features/augment/perm_all,
   sens_folder: ./data/wear/raw/inertial,
   sampling_rate: 50,
   file_prefix: ~,
@@ -27,13 +45,13 @@ dataset: {
   force_upsampling: False,
 }
 augmentation: {
-  permutation: True,
-  normalization: True,
+  permutation: False,
+  normalization: False,
   inverting: False,
   reversing: False,
   magnify: False,
   scaling: False,
-  noise: True,
+  noise: False,
 }
 model: {
   model_name: TriDet,
