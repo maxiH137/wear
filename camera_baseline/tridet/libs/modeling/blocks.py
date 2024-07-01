@@ -225,7 +225,7 @@ class AdapterBlock(nn.Module):
         self.act = act_layer()
 
     def forward(self, x, mask, pos_embd=None):
-        hidden_dims = 128
+        hidden_dims = self.temporal_size
         h = 1
         w = 1
 
@@ -236,14 +236,11 @@ class AdapterBlock(nn.Module):
         # down and up projection
         for i in range(tmp.shape[0]):
             out[i] = self.act(self.down_proj(tmp[i].T)).cpu().detach().numpy()
-        #print("Down proj shape: " + str(out.shape))
         # temporal depth-wise convolution
         B, N, C = out.shape # 2, 2304, 128
         out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype).cuda()
         attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
-        #print("Reshape shape: " + str(attn.shape))
         attn = attn.permute(0, 2, 3, 1, 4).flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
-        #print("Permute shape: " + str(attn.shape))
         attn = torch.tensor(attn, dtype=self.dwconv.conv.weight.dtype)
         mask = torch.tensor(mask, dtype=self.dwconv.conv.weight.dtype)
 
@@ -255,7 +252,6 @@ class AdapterBlock(nn.Module):
 
         out = self.up_proj(out)
         out = out.permute(0,2,1)
-        #print("Output shape: " + str(out.shape))
         return out * self.gamma + inputs, out_mask
 
 class SGPBlock(nn.Module):
