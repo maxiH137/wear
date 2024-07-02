@@ -256,7 +256,7 @@ class AdapterBlock(nn.Module):
 
         # temporal depth-wise convolution
         self.temporal_size = temporal_size
-        self.dwconv = MaskedConv3D(
+        self.dwconv = nn.Conv3d(
              hidden_dims, 
              hidden_dims, 
              (kernel_size,1,1), 
@@ -266,8 +266,8 @@ class AdapterBlock(nn.Module):
         )
 
         self.conv = MaskedConv1D(hidden_dims, hidden_dims, 1)
-        self.dwconv.conv.weight.data.normal_(mean=0.0, std=math.sqrt(2.0 / kernel_size))
-        self.dwconv.conv.bias.data.zero_()
+        self.dwconv.weight.data.normal_(mean=0.0, std=math.sqrt(2.0 / kernel_size))
+        self.dwconv.bias.data.zero_()
         self.conv.conv.weight.data.normal_(mean=0.0, std=math.sqrt(2.0 / hidden_dims))
         self.conv.conv.bias.data.zero_()
 
@@ -294,19 +294,15 @@ class AdapterBlock(nn.Module):
             out[i] = self.act(self.down_proj(tmp[i].T)).cpu().detach().numpy()
         # temporal depth-wise convolution
         B, N, C = out.shape # 2, 2304, 128
-        out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype).cuda()
+        out = torch.tensor(out, dtype=self.dwconv.weight.dtype).cuda()
         attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
         attn = attn.permute(4, 1, 0, 2, 3)#.flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
-        attn = torch.tensor(attn, dtype=self.dwconv.conv.weight.dtype)
-        mask = torch.tensor(mask, dtype=self.dwconv.conv.weight.dtype)
-        """ tmp_mask = np.zeros((mask.shape[0], mask.shape[1], mask.shape[2], 3, 3))
-        print(tmp_mask.shape)
-        tmp_mask = torch.tensor(tmp_mask, dtype=self.dwconv.conv.weight.dtype)
-        for i in range(tmp_mask.shape[3]):
-            for j in range(tmp_mask.shape[4]):
-                tmp_mask[:,:,:,i,j] = mask """
-        attn, out_mask = self.dwconv(attn, mask)  # [b*h*w,c,t] [2304, 128, 2, 3, 3]
-        #out_mask = mask
+        attn = torch.tensor(attn, dtype=self.dwconv.weight.dtype)
+        mask = torch.tensor(mask, dtype=self.dwconv.weight.dtype)
+        attn = self.dwconv(attn)  # [b*h*w,c,t] [2304, 128, 2, 3, 3]
+        out_mask = mask.detach()
+        #attn = attn * out_mask
+        
 
         attn = attn.permute(2, 3, 4, 1, 0).flatten(0, 2)
 

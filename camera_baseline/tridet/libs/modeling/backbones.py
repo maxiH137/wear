@@ -136,7 +136,7 @@ class SGPBackbone(nn.Module):
         # main branch with downsampling
         for idx in range(len(self.branch)):
             x, mask = self.branch[idx](x, mask)
-            if(idx % 2 == 1):
+            if(idx % 2 == 0):
                 out_feats += (x, )
                 out_masks += (mask, )
         return out_feats, out_masks
