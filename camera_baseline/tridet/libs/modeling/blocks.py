@@ -58,6 +58,8 @@ class MaskedConv1D(nn.Module):
             out_mask = mask.to(x.dtype)
 
         # masking the output, stop grad to mask
+        #print(out_conv.shape)
+        #print(out_mask.shape)
         out_conv = out_conv * out_mask.detach()
         out_mask = out_mask.bool()
         return out_conv, out_mask
@@ -82,7 +84,7 @@ class MaskedConv3D(nn.Module):
     ):
         super().__init__()
         # element must be aligned
-        assert (kernel_size % 2 == 1) and (kernel_size // 2 == padding)
+        assert (tuple(ele1 % ele2 for ele1, ele2 in zip(kernel_size, (2,2,2))) == (1,1,1)) and (tuple(ele1 // ele2 for ele1, ele2 in zip(kernel_size, (2,2,2))) == padding)
         # stride
         self.stride = stride
         self.conv = nn.Conv3d(in_channels, out_channels, kernel_size,
@@ -94,18 +96,18 @@ class MaskedConv3D(nn.Module):
     def forward(self, x, mask):
         # x: batch size, feature channel, sequence length,
         # mask: batch size, 1, sequence length (bool)
-        B, C, T = x.size()
+        B, C, T, H, W = x.size()
         # input length must be divisible by stride
-        assert T % self.stride == 0
+        assert T % self.stride[0] == 0
 
         # conv
         out_conv = self.conv(x)
         # compute the mask
-        if self.stride > 1:
+        if self.stride[0] > 1:
             # downsample the mask using nearest neighbor
             out_mask = F.interpolate(
                 mask.to(x.dtype),
-                size=T // self.stride,
+                size=T // self.stride[0],
                 mode='nearest'
             )
         else:
@@ -258,8 +260,8 @@ class AdapterBlock(nn.Module):
              hidden_dims, 
              hidden_dims, 
              (kernel_size,1,1), 
-             n_ds_stride, 
-             padding=(kernel_size // 2) * n_ds_stride,
+             (n_ds_stride,1,1), 
+             padding=((kernel_size // 2) * n_ds_stride,0,0),
              groups=hidden_dims
         )
 
@@ -284,25 +286,30 @@ class AdapterBlock(nn.Module):
         h = 1
         w = 1
 
-        #print("Input shape: " + str(x.shape))
         inputs = x
         tmp = x.detach().clone()
         out = np.zeros((x.shape[0], x.shape[2],hidden_dims), np.double)
         # down and up projection
         for i in range(tmp.shape[0]):
             out[i] = self.act(self.down_proj(tmp[i].T)).cpu().detach().numpy()
-        #print("Down proj shape: " + str(out.shape))
         # temporal depth-wise convolution
         B, N, C = out.shape # 2, 2304, 128
         out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype).cuda()
         attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
-        #print("Reshape shape: " + str(attn.shape))
-        attn = attn.permute(0, 2, 3, 1, 4).flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
-        #print("Permute shape: " + str(attn.shape))
+        attn = attn.permute(4, 1, 0, 2, 3)#.flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
         attn = torch.tensor(attn, dtype=self.dwconv.conv.weight.dtype)
         mask = torch.tensor(mask, dtype=self.dwconv.conv.weight.dtype)
+        """ tmp_mask = np.zeros((mask.shape[0], mask.shape[1], mask.shape[2], 3, 3))
+        print(tmp_mask.shape)
+        tmp_mask = torch.tensor(tmp_mask, dtype=self.dwconv.conv.weight.dtype)
+        for i in range(tmp_mask.shape[3]):
+            for j in range(tmp_mask.shape[4]):
+                tmp_mask[:,:,:,i,j] = mask """
+        attn, out_mask = self.dwconv(attn, mask)  # [b*h*w,c,t] [2304, 128, 2, 3, 3]
+        #out_mask = mask
 
-        attn, out_mask = self.dwconv(attn, mask)  # [b*h*w,c,t] [1*1*1,128,2304]
+        attn = attn.permute(2, 3, 4, 1, 0).flatten(0, 2)
+
         attn, out_mask = self.conv(attn, out_mask)  # [b*h*w,c,t] [1*1*1,128,2304]
         attn = attn.unflatten(0, (-1, h, w)).permute(0, 4, 1, 2, 3)  # [b,t,h,w,c] [1,2304,1,1,128]
         attn = attn.reshape(B, N, C)
@@ -310,7 +317,6 @@ class AdapterBlock(nn.Module):
 
         out = self.up_proj(out)
         out = out.permute(0,2,1)
-        #print("Output shape: " + str(out.shape))
         return out * self.gamma + inputs, out_mask
 
 class SGPBlock(nn.Module):

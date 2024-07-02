@@ -11,7 +11,7 @@ import torch.optim as optim
 
 from .lr_schedulers import LinearWarmupMultiStepLR, LinearWarmupCosineAnnealingLR
 from .postprocessing import postprocess_results
-from ..modeling import MaskedConv1D, Scale, AffineDropPath, LayerNorm
+from ..modeling import MaskedConv1D, MaskedConv3D, Scale, AffineDropPath, LayerNorm
 
 
 ################################################################################
@@ -63,7 +63,7 @@ def make_optimizer(model, optimizer_config):
     # see https://github.com/karpathy/minGPT/blob/master/mingpt/model.py#L134
     decay = set()
     no_decay = set()
-    whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, MaskedConv1D)
+    whitelist_weight_modules = (torch.nn.Linear, torch.nn.Conv1d, torch.nn.Conv3d, MaskedConv1D, MaskedConv3D)
     blacklist_weight_modules = (LayerNorm, torch.nn.GroupNorm)
 
     # loop over all modules / params
