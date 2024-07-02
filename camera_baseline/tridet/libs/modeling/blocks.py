@@ -62,6 +62,60 @@ class MaskedConv1D(nn.Module):
         out_mask = out_mask.bool()
         return out_conv, out_mask
 
+class MaskedConv3D(nn.Module):
+    """
+    Masked 3D convolution. Interface remains the same as Conv3d.
+    Only support a sub set of 3d convs
+    """
+
+    def __init__(
+            self,
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=1,
+            padding=0,
+            dilation=1,
+            groups=1,
+            bias=True,
+            padding_mode='zeros'
+    ):
+        super().__init__()
+        # element must be aligned
+        assert (kernel_size % 2 == 1) and (kernel_size // 2 == padding)
+        # stride
+        self.stride = stride
+        self.conv = nn.Conv3d(in_channels, out_channels, kernel_size,
+                              stride, padding, dilation, groups, bias, padding_mode)
+        # zero out the bias term if it exists
+        if bias:
+            torch.nn.init.constant_(self.conv.bias, 0.)
+
+    def forward(self, x, mask):
+        # x: batch size, feature channel, sequence length,
+        # mask: batch size, 1, sequence length (bool)
+        B, C, T = x.size()
+        # input length must be divisible by stride
+        assert T % self.stride == 0
+
+        # conv
+        out_conv = self.conv(x)
+        # compute the mask
+        if self.stride > 1:
+            # downsample the mask using nearest neighbor
+            out_mask = F.interpolate(
+                mask.to(x.dtype),
+                size=T // self.stride,
+                mode='nearest'
+            )
+        else:
+            # masking out the features
+            out_mask = mask.to(x.dtype)
+
+        # masking the output, stop grad to mask
+        out_conv = out_conv * out_mask.detach()
+        out_mask = out_mask.bool()
+        return out_conv, out_mask
 
 class LayerNorm(nn.Module):
     """
@@ -200,12 +254,13 @@ class AdapterBlock(nn.Module):
 
         # temporal depth-wise convolution
         self.temporal_size = temporal_size
-        self.dwconv = MaskedConv1D(
+        self.dwconv = MaskedConv3D(
              hidden_dims, 
              hidden_dims, 
-             kernel_size, 
+             (kernel_size,1,1), 
              n_ds_stride, 
-             padding=(kernel_size // 2) * n_ds_stride
+             padding=(kernel_size // 2) * n_ds_stride,
+             groups=hidden_dims
         )
 
         self.conv = MaskedConv1D(hidden_dims, hidden_dims, 1)
@@ -225,7 +280,7 @@ class AdapterBlock(nn.Module):
         self.act = act_layer()
 
     def forward(self, x, mask, pos_embd=None):
-        hidden_dims = self.temporal_size
+        hidden_dims = 128
         h = 1
         w = 1
 
@@ -236,11 +291,14 @@ class AdapterBlock(nn.Module):
         # down and up projection
         for i in range(tmp.shape[0]):
             out[i] = self.act(self.down_proj(tmp[i].T)).cpu().detach().numpy()
+        #print("Down proj shape: " + str(out.shape))
         # temporal depth-wise convolution
         B, N, C = out.shape # 2, 2304, 128
         out = torch.tensor(out, dtype=self.dwconv.conv.weight.dtype).cuda()
         attn = out.reshape(-1, self.temporal_size, h, w, x.shape[-1])  # [b,t,h,w,c]  [1,128,1,1,2304]
+        #print("Reshape shape: " + str(attn.shape))
         attn = attn.permute(0, 2, 3, 1, 4).flatten(0, 2)  # [b*h*w,c,t] [1*1*1,128,2304]
+        #print("Permute shape: " + str(attn.shape))
         attn = torch.tensor(attn, dtype=self.dwconv.conv.weight.dtype)
         mask = torch.tensor(mask, dtype=self.dwconv.conv.weight.dtype)
 
@@ -252,6 +310,7 @@ class AdapterBlock(nn.Module):
 
         out = self.up_proj(out)
         out = out.permute(0,2,1)
+        #print("Output shape: " + str(out.shape))
         return out * self.gamma + inputs, out_mask
 
 class SGPBlock(nn.Module):
