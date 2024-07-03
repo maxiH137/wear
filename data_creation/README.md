@@ -22,6 +22,9 @@ Once having performed a session you will need to synchronize the camera and iner
 4. Run the `3_create_raw_inertial_dataset.py` to create a final `.csv`-file per subject containing all sensor axis as well as labels.
 5. Compute I3D features for all created videos using clip lenghts of 0.5, 1 and 2 seconds. Concatenate rgb and flow features such that you are left with one `.npy` file per subject containing a feature vector of size `2048` per clip.
 6. Finally, having created all relevant files run the `4_create_features_and_annotations_dataset.py`. It will create all processed files such as the vectorized inertial features and combined features (inertial + camera) used during the multimodal experiments.
+7. The file `4_create_features_and_annotations_dataset_aug.py` allows Data Augmentation of the inertial data. The Augmentation can be controlled in the config files in the augmentation dictionary. You can control it by changing False/True. 
+Possible augmentations are: normalization, permutation, scaling, magniy, noise, inverting.
+The annotations are saved in the same file and all the created data is saved in `./data/wear/processed/inertial_features/augment/set1`. 
 
 ## Contact
 If you have any questions about the data collection process and would like to contribute to our dataset, please do not hesitate to contact us via marius.bock@uni-siegen.de.

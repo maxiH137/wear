@@ -6,10 +6,9 @@ import argparse
 
 from utils import apply_sliding_window, label_dict, convert_labels_to_annotation_json, load_config
 
-# define loso
-sbjs = [['sbj_0'], ['sbj_1'], ['sbj_2'], ['sbj_3'], ['sbj_4'], ['sbj_5'], ['sbj_6'], ['sbj_7'], ['sbj_8'], ['sbj_9'], ['sbj_10'], ['sbj_11'], ['sbj_12'], ['sbj_13'], ['sbj_14'], ['sbj_15'], ['sbj_16'], ['sbj_17']]
 # define split
-#sbjs = [['sbj_0', 'sbj_1', 'sbj_2', 'sbj_3', 'sbj_4', 'sbj_5'], ['sbj_6', 'sbj_7', 'sbj_8', 'sbj_9', 'sbj_10', 'sbj_11'], ['sbj_12', 'sbj_13', 'sbj_14', 'sbj_15', 'sbj_16', 'sbj_17']]
+#sbjs = [['sbj_0'], ['sbj_1'], ['sbj_2'], ['sbj_3'], ['sbj_4'], ['sbj_5'], ['sbj_6'], ['sbj_7'], ['sbj_8'], ['sbj_9'], ['sbj_10'], ['sbj_11'], ['sbj_12'], ['sbj_13'], ['sbj_14'], ['sbj_15'], ['sbj_16'], ['sbj_17']]
+sbjs = [['sbj_0', 'sbj_1', 'sbj_2', 'sbj_3', 'sbj_4', 'sbj_5'], ['sbj_6', 'sbj_7', 'sbj_8', 'sbj_9', 'sbj_10', 'sbj_11'], ['sbj_12', 'sbj_13', 'sbj_14', 'sbj_15', 'sbj_16', 'sbj_17']]
 
 # change these parameters
 window_size = 50
@@ -25,7 +24,7 @@ inertial_folder_flat = './data/wear/processed/inertial_features/custom_flat'
 inertial_folder_custom = './data/wear/processed/inertial_features/custom'
 inertial_folder_aug = './data/wear/processed/inertial_features/augment'
 inertial_folder = './data/wear/processed/inertial_features/{}_frames_{}_stride'.format(frames, stride)
-aug_folder = '/perm_all'
+aug_folder = '/set1'
 
 #i3d_folder = './data/wear/processed/i3d_features/{}_frames_{}_stride'.format(frames, stride)
 #combined_folder = './data/wear/processed/combined_features/{}_frames_{}_stride'.format(frames, stride)
@@ -129,7 +128,7 @@ def noise(inertial_sbj):
 
 
 def save_augment(sbj_perm, sbj, number, perm, augment, cfg):
-    
+    #x = sbj_perm.label._values
     inertial_sbj = sbj_perm.replace({"label": label_dict}).fillna(-1).to_numpy()
     inertial_sbj[:, -1] += 1
     _, win_sbj, _ = apply_sliding_window(inertial_sbj, window_size, window_overlap)
@@ -165,6 +164,26 @@ def save_augment(sbj_perm, sbj, number, perm, augment, cfg):
             number += 1
         np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), output_inertial)
     else:
+        if(cfg['noise']):
+            noise_inertial = noise(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), noise_inertial)
+            number += 1
+        if(cfg['scaling']):
+            scaling_inertial = scaling(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), scaling_inertial)
+            number += 1
+        if(cfg['magnify']):
+            magnify_inertial = magnify(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), magnify_inertial)
+            number += 1
+        if(cfg['reversing']):
+            reversing_inertial = reversing(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), reversing_inertial)
+            number += 1
+        if(cfg['inverting']):
+            inverting_inertial = inverting(output_inertial)
+            np.save(os.path.join(inertial_folder_aug + perm, 'sbj_' + str(number) + '.npy'), inverting_inertial)
+            number += 1
         np.save(os.path.join(inertial_folder_aug + perm, str(sbj) + '.npy'), output_inertial)
     
     return number
@@ -212,10 +231,7 @@ def activity_sbj(sbj, label):
 def data_creation(args):
 
     config = load_config(args.config)
-    number_anno = 17
     number = 18
-    amount_aug_saved = 0
-    aug_saved_times = 0
     #raw_intertial_sbj_all = None
 
     for i, split_sbjs in enumerate(sbjs):
@@ -242,7 +258,7 @@ def data_creation(args):
             # Normal Subject without Augmentation except Normalization if True
             number = save_augment(raw_inertial_sbj, sbj,number, aug_folder, False, config['augmentation'])
             
-            # Augment Data, use the permuted subjects
+            # Augmented Data, especially Permutated data
             if(config['augmentation']['permutation']):
                 number = save_augment(raw_inertial_sbj_perm1, sbj, number, aug_folder, True, config['augmentation'])
                 number += 1
@@ -254,9 +270,7 @@ def data_creation(args):
                 number += 1
                 number = save_augment(raw_inertial_sbj_perm5, sbj, number, aug_folder, True, config['augmentation'])
                 number += 1
-
-            amount_aug_saved = (number - (nb_sbjs - 1)) - (amount_aug_saved - 1) * aug_saved_times
-            aug_saved_times += 1
+            
             
             inertial_sbj = raw_inertial_sbj.replace({"label": label_dict}).fillna(-1).to_numpy()
             inertial_sbj[:, -1] += 1
@@ -279,6 +293,7 @@ def data_creation(args):
         
         
         # create video annotations
+        number_anno = 18
         for j in range(nb_sbjs):
             curr_sbj = "sbj_" + str(j)
             raw_inertial_sbj_t = pd.read_csv(os.path.join(raw_inertial_folder, curr_sbj + '.csv'), index_col=None)
@@ -289,13 +304,151 @@ def data_creation(args):
             if curr_sbj in split_sbjs:
                 train_test = 'Validation'
                 wear_annotations = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
+
+                if(config['augmentation']['permutation']):
+                    number_anno += 5
+
+                if(config['augmentation']['scaling']):
+                    if(config['augmentation']['permutation']):
+                        number_anno += 6
+                    else:
+                        number_anno += 1
+
+                if(config['augmentation']['magnify']):
+                    if(config['augmentation']['permutation']):
+                        number_anno += 6
+                    else:
+                        number_anno += 1
+
+                if(config['augmentation']['noise']):
+                    if(config['augmentation']['permutation']):
+                        number_anno += 6
+                    else:
+                        number_anno += 1
+
+                if(config['augmentation']['reversing']):
+                    if(config['augmentation']['permutation']):
+                        number_anno += 6
+                    else:
+                        number_anno += 1
+
+                if(config['augmentation']['inverting']):
+                    if(config['augmentation']['permutation']):
+                        number_anno += 6
+                    else:
+                        number_anno += 1
             else:
                 train_test = 'Training'
                 wear_annotations = wear_anno(wear_annotations, j, sbj_annos, train_test, duration_seconds)
+                #for number_saved in range(amount_aug_saved+1):
+                #    wear_annotations = wear_anno(wear_annotations, number_anno + number_saved + 1 + (j*amount_aug_saved), sbj_annos, train_test, duration_seconds)
                 
                 if(config['augmentation']['permutation']):
-                    for number_saved in range(amount_aug_saved+1):
-                        wear_annotations = wear_anno(wear_annotations, number_anno + number_saved + 1 + (j*amount_aug_saved), sbj_annos, train_test, duration_seconds)
+                    wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                    number_anno += 1
+                    wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                    number_anno += 1
+                    wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                    number_anno += 1
+                    wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                    number_anno += 1
+                    wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                    number_anno += 1
+
+                if(config['augmentation']['scaling']):
+                   
+                    if(config['augmentation']['permutation']):
+                        wear_annotations = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                    else:
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+
+                if(config['augmentation']['magnify']):
+                   
+                    if(config['augmentation']['permutation']):
+                        wear_annotations = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                    else:
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+
+                if(config['augmentation']['noise']):
+              
+                    if(config['augmentation']['permutation']):
+                        wear_annotations = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                    else:
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+
+                if(config['augmentation']['reversing']):
+                  
+                    if(config['augmentation']['permutation']):
+                        wear_annotations = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                    else:
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        
+                if(config['augmentation']['inverting']):
+                
+                    if(config['augmentation']['permutation']):
+                        wear_annotations = wear_anno(wear_annotations, number_anno, sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
+                    else:
+                        wear_annotations = wear_anno(wear_annotations, number_anno , sbj_annos, train_test, duration_seconds)
+                        number_anno += 1
 
             with open(os.path.join(anno_folder, 'wear_split_aug_' + str(int(i + 1)) +  '.json'), 'w') as outfile:
                 outfile.write(json.dumps(wear_annotations, indent = 4))
