@@ -7,12 +7,12 @@
 [![CC BY-NC-SA 4.0][cc-by-nc-sa-shield]][cc-by-nc-sa]
 ## About this repository
 This repository was imported from: https://github.com/mariusbock/wear. <br/>
-We extended the existing repository with our approaches:
+We extended the existing repository with the following approaches:
 1. Integration of a Temporal-Informative adapter
 2. Data Augmentation 
 
-The files for 1. are consisting of several extension in the camera_baseline folder. <br/>
-The file "4_create_features_and_annotations_aug.py" for 2. is placed the data_creation folder and can be used to create augmented data. 
+The files for 1. consist of several extensions in the model files in the camera_baseline folder. <br/>
+The file "4_create_features_and_annotations_aug.py" for 2. is placed the data_creation folder and can be used to create augmented data/subjects. 
 ## Abstract
 In this report, we describe the technical details of our submission to
 the WEAR Dataset Challenge 2024. For this competition, we use two
@@ -24,7 +24,7 @@ roughly 4.7% improved results on the test set of the WEAR Dataset
 Challenge 2024 compared to the baseline of the WEAR repository.
 
 ## Changelog
-- 26/09/2024: set the repository public
+- 26/09/2024: set the repository to public
 ## Installation
 Please follow instructions mentioned in the [INSTALL.md](/INSTALL.md) file.
 
@@ -37,7 +37,7 @@ The download folder is divided into 3 subdirectories
 - **raw (130GB)**: Raw, per-subject video and inertial data
 
 ## Reproduce Experiments from TA-DA
-Once having installed requirements, one can rerun experiments by running the `main.py` script:
+Once having installed requirements, one can rerun experiments by running the `create_features_and_annotations_mod.py` for data augmentation and the `main.py` script for the experiment:
 
 ````
 python create_features_and_annotations_mod.py --config ./configs/60_frames_30_stride/tridet_inertial_aug.yaml
@@ -65,9 +65,9 @@ TA-DA! is offered under a
 
 ## Contact
  
-<!--<Helge Hartleb (helge.hartleb@student.uni-siegen.de)/>-->
+Helge Hartleb (helge.hartleb@student.uni-siegen.de)
 
-<!--<>Maximilian Hopp (maximilian2.hopp@student.uni-siegen.de)/>-->
+Maximilian Hopp (maximilian2.hopp@student.uni-siegen.de)
 
 ## Cite as
 ```
